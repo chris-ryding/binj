@@ -2,7 +2,7 @@
 
 Binary INJection - a command-line utility to modify data in binary files
 
-`binj` (pronounced like "binge") is a utility to add, delete, and modify data in a binary file or data stream. It reads from either a given file or standard in and writes the modified data to a designated output file or standard out.
+`binj` (pronounced "binge") is a utility to add, delete, and modify data in a binary file or data stream. It reads from either a given file or standard in and writes the modified data to a designated output file or standard out.
 
 ## Command syntax
 
