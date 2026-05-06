@@ -1,26 +1,26 @@
 use std::env;
 use std::fs;
-use std::process;
 use std::io::Read;
+use std::process;
 
-#[derive(Debug)]
+#[derive( Debug )]
 enum IoChannel {
-  Stdio,
-  File( String ),
+    Stdio,
+    File( String ),
 }
 
-#[derive(Debug)]
+#[derive( Debug )]
 enum OpCode {
-    Insert,
-    Delete,
-    Replace,
+    Insert( u32, Box<[u8]> ),  // offset, data
+    Delete( u32, u32 ),        // offset, byte count
+    Replace( u32, Box<[u8]> ), // offset, data
 }
 
-#[derive(Debug)]
+#[derive( Debug )]
 struct Config {
-    input_handle : IoChannel,
-    output_handle : IoChannel,
-    operations : Vec<OpCode>,
+    input_handle: IoChannel,
+    output_handle: IoChannel,
+    operations: Vec<OpCode>,
 }
 
 /*****************************************************************************/
@@ -28,38 +28,39 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     let opts = Config::build( &args ).unwrap_or_else( |err| {
-        println!("Problem parsing arguments: {err}");
-        process::exit(1);
+        println!( "Problem parsing arguments: {err}" );
+        process::exit( 1 );
     });
-
-    println!( "opts : {opts:?}" );
 
     if let Err( e ) = run( opts ) {
         println!( "Application error: {e}" );
-        process::exit(1);
+        process::exit( 1 );
     }
 
     process::exit( 0 );
 }
 
-
 /*****************************************************************************/
 fn run( config: Config ) -> Result<(), std::io::Error> {
     match config.input_handle {
-        IoChannel::Stdio => println!("Reading from stdio"),
-        IoChannel::File( fname ) => println!("Reading from file {fname:?}"),
+        IoChannel::Stdio => println!( "Reading from stdio" ),
+        IoChannel::File(fname) => println!( "Reading from file {fname:?}" ),
     }
 
-    let mut in_file = fs::File::open( String::from("src/main.rs") )//config.input_handle )
-                            .expect( "Unable to open input file." );
+    for cfg_types in config.operations.iter() {
+        println!( "{cfg_types:?}" );
+    }
 
-    let mut read_idx : u64 = 0;
+    let mut in_file = fs::File::open( String::from( "src/main.rs" ))
+                            .expect("Unable to open input file.");
+
+    let mut read_idx: u32 = 0;
 
     loop {
-        let mut buf : [u8; 0x1000] = [0; 0x1000]; // need heap allocation here
+        let mut buf: [u8; 0x1000] = [0; 0x1000]; // need heap allocation here
 
         let byte_count = in_file.read( &mut buf )?;
-        read_idx += byte_count as u64;
+        read_idx += byte_count as u32;
 
         if byte_count == 0 {
             break;
@@ -67,40 +68,53 @@ fn run( config: Config ) -> Result<(), std::io::Error> {
     }
 
     match config.output_handle {
-        IoChannel::Stdio => println!("Write to stdio"),
-        IoChannel::File( fname ) => println!("Write to file {fname:?}"),
+        IoChannel::Stdio => println!( "Write to stdio" ),
+        IoChannel::File( fname ) => println!( "Write to file {fname:?}" ),
     }
 
-    println!("{read_idx:?}");
-    Ok(())
+    println!( "{read_idx:?}" );
+    Ok( () )
 }
 
 /*****************************************************************************/
 
 impl Config {
     fn build( args: &[String] ) -> Result<Config, &'static str> {
+        // Start by creating a default config struct that we can populate
         let mut cfg = Config {
-            input_handle : IoChannel::Stdio,
-            output_handle : IoChannel::Stdio,
-            operations : Vec::new()
+            input_handle: IoChannel::Stdio,
+            output_handle: IoChannel::Stdio,
+            operations: Vec::new(),
         };
-        let mut idx = 0;
-        for argv in args.iter() {
-            println!("arg {idx}: {argv}");
-            idx += 1;
 
-            if idx == 1 {
-                // Don't process the executable's name
-                continue;
-            }
+        let mut args_iter = args.iter();
+        args_iter.next(); // skip the executable's name
 
+        // Step through each actual parameter
+        for argv in args_iter {
+            // Grab the first character to figure out what this is
             let mut operator = argv.chars();
-            let op_code = operator.next().unwrap();
+            let op_code = operator
+                .next()
+                .expect( "Somehow we got an empty value for the first character in a parameter" );
+
             match op_code {
-                'I' => cfg.operations.push(OpCode::Insert),
-                'D' => cfg.operations.push(OpCode::Delete),
-                'R' => cfg.operations.push(OpCode::Replace),
-                _ => eprintln!("Error: Unknown operation '{op_code}'"),
+                'I' => {    // Insert
+                    cfg.operations.push( OpCode::Insert( 0, Box::new( [0] )));
+                    println!( "Insert param: {argv}" );
+                }
+                'D' => {    // Delete
+                    cfg.operations.push( OpCode::Delete( 0, 0 ));
+                    println!( "Delete param: {argv}" );
+                }
+                'R' => {    // Replace
+                    cfg.operations.push( OpCode::Replace( 0, Box::new( [0] )));
+                    println!( "Replace param: {argv}" );
+                }
+                '-' => {
+                    println!( "Optional parameter found: {argv}" );
+                },
+                _ => eprintln!( "Error: Unknown operation '{op_code}'" ),
             }
         }
 
